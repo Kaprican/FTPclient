@@ -1,0 +1,7 @@
+ftp://212.193.68.227/python/hw5/v2/test.py
+
+cisco: 72.163.7.54
+mccme.ru: 185.54.136.70
+
+ftp://ftp.cisco.com/pub/mibs/README-MIB.txt
+ftp://ftp.mccme.ru/
