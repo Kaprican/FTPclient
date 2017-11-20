@@ -58,6 +58,9 @@ FTP — File Transfer Protocol (букв. «протокол передачи ф
                 ls -r $number     Показать содержимое текущей директории и её вложенных папок до $number уровня в глубину
         cd      cd $new_dir       Сменить директорию
         pwd     pwd               Показать текущую диреторию
+        mkd     mkd $new_dir      Создать директорию
+        rmd     rmd $dir_name     Удалить директорию
+        rename  rename $old $new  Переименовать файл или директорию с именем $old на $new
         size    size $filename    Размер файла с именем $filename
         user    user $username    Сменить пользователя
         pasv    pasv              Установить пассивный режим

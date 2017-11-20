@@ -24,8 +24,8 @@ class FTPclientTest(unittest.TestCase):
     def test_directories(self):
         folder = 'some_dir'
         expected = '257 "' + folder + '" is your current location\r\n'
-        self.ftp.cwd(None, folder)
-        curr_dir = self.ftp.pwd()
+        self.ftp.change_dir(None, folder)
+        curr_dir = self.ftp.current_dir()
         self.assertEqual(curr_dir, expected)
 
     def test_get(self):

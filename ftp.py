@@ -43,13 +43,11 @@ class FTP:
         """Log in on FTP-sever"""
         if name is None:
             name = input('Enter your username: ')
-        self.sock.sendall(bytes('USER {}\r\n'.format(name), 'ASCII'))
-        self.receive_answer()
+        self.send('USER', name)
         # print(reply)
         if passw is None:
             passw = input('Enter your password: ')
-        self.sock.sendall(bytes('PASS {}\r\n'.format(passw), 'ASCII'))
-        reply = self.receive_answer()
+        reply = self.send('PASS', passw)
         # print(reply)
         if not re.match(r'2\d\d', reply):
             raise LoginException('Login is incorrect. Try again')
@@ -102,8 +100,7 @@ class FTP:
             sock = self.port()
         else:
             data_sock = self.pasv()
-        self.send('RETR', file_to_load)
-        reply = self.receive_answer()
+        reply = self.send('RETR', file_to_load)
         # print(reply)
 
         if not reply.startswith('150'):
@@ -137,8 +134,7 @@ class FTP:
             sock = self.port()
         else:
             data_sock = self.pasv()
-        self.send('STOR', remote_name)
-        reply = self.receive_answer()
+        reply = self.send('STOR', remote_name)
         # print(reply)
         if reply[0] == '5':
             raise PermissionError('You have no permission to store the file. '
@@ -159,8 +155,7 @@ class FTP:
 
     def pasv(self, data_sock=None, argument=None, extra_arg=None):
         """Switch on passive mode"""
-        self.send('PASV')
-        reply = self.receive_answer()
+        reply = self.send('PASV')
         # print(reply)
         reg = r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)'
         numbs = re.findall(reg, reply)[0]
@@ -174,9 +169,9 @@ class FTP:
         try:
             data_sock.connect((ip_address, port))
         except ConnectionError as error:
-            print(error)
+            raise error
         except Exception as error:
-            print(error)
+            raise error
         self.passive = True
         return data_sock
 
@@ -191,8 +186,7 @@ class FTP:
         port_int, port_modulo = local_port // 256, local_port % 256
         query = 'PORT {},{},{}'.format(ip_address.replace('.', ','),
                                        port_int, port_modulo)
-        self.send(query)
-        reply = self.receive_answer()
+        reply = self.send(query)
         # print(reply)
         if not reply.startswith('2'):
             raise PortNotAllowedError('Active mode is not available')
@@ -208,8 +202,7 @@ class FTP:
                 data_sock = self.pasv()
         else:
             data_sock = self.pasv()
-        self.send('LIST')
-        reply = self.receive_answer()
+        reply = self.send('LIST')
         # print(reply)
         if not self.passive:
             data_sock, address = sock.accept()
@@ -228,10 +221,10 @@ class FTP:
             result = re.findall(reg, data)
             for folder in result:
                 try:
-                    self.cwd(data_sock, folder, True)
+                    self.change_dir(data_sock, folder, True)
                 except NotChangedDirectoryError as e:
                     continue
-                pwd_reply = self.pwd(data_sock, True, None)
+                pwd_reply = self.current_dir(data_sock, True, None)
                 curr_folder = re.findall(r'\"(.+)\"', pwd_reply)[0]
                 dir_list += curr_folder + '\n'
                 dir_list = self.dir_list(data_sock, '-r',
@@ -239,7 +232,7 @@ class FTP:
                                          dir_list)
                 dir = re.findall(r'\"(.+)\"', pwd_reply)[0].split('/')
                 new_dir = '/'.join(dir[:len(dir) - 1])
-                self.cwd(None, '/' + new_dir, True)
+                self.change_dir(None, '/' + new_dir, True)
         return dir_list
 
     @staticmethod
@@ -279,13 +272,13 @@ class FTP:
         asciidata = query.encode("utf-8", "ignore")
         self.sock.sendall(bytes(asciidata))
         # self.sock.sendall(bytes(query, 'ASCII'))
+        return self.receive_answer()
 
     def size(self, data_sock, filename, path_value=None):
         """Return file size"""
         if filename is None:
             raise ValueError('You don\'t specify file name')
-        self.send('SIZE', filename)
-        reply = self.receive_answer()
+        reply = self.send('SIZE', filename)
         reg = r' (\d+)'
         result = re.findall(reg, reply)
         return int(result[0])
@@ -300,8 +293,7 @@ class FTP:
         """Switch type of data on server"""
         if type is None:
             raise NoTypeException('Please specify the type')
-        self.send('TYPE', type.upper())
-        reply = self.receive_answer()
+        reply = self.send('TYPE', type.upper())
         if not reply.startswith('2'):
             raise WrongTypeException('This data type does not exist')
         self.binary = type == 'I'
@@ -309,8 +301,7 @@ class FTP:
 
     def disconnect(self, data_sock=None, argument=None, extra_arg=None):
         """Abort a session"""
-        self.send('QUIT')
-        reply = self.receive_answer()
+        reply = self.send('QUIT')
         self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
         self.closed = True
@@ -322,48 +313,47 @@ class FTP:
         self.sock.connect((address, port))
         return self.receive_answer()
 
-    def cwd(self, data_sock, path, extra_arg=None):
+    def change_dir(self, data_sock, path, extra_arg=None):
         """Change working directory"""
-        self.send('CWD', path)
-        reply = self.receive_answer()
+        reply = self.send('CWD', path)
         if not reply.startswith('2'):
             raise NotChangedDirectoryError('Cannot change directory')
 
-    def pwd(self, data_sock=None, arg=None, extra_arg=None):
-        """Print or return working directory"""
-        self.send('PWD')
-        reply = self.receive_answer()
+    def current_dir(self, data_sock=None, arg=None, extra_arg=None):
+        """Return working directory"""
+        reply = self.send('PWD')
         return reply
 
-    def mkd(self, data_sock=None, folder_name=None, extra_arg=None):
+    def make_dir(self, data_sock=None, folder_name=None, extra_arg=None):
         """Make directory"""
-        self.send('MKD', folder_name)
-        reply = self.receive_answer()
+        reply = self.send('MKD', folder_name)
         if not reply.startswith('2'):
             raise NotChangedDirectoryError('Cannot make directory')
 
-    def rmd(self, data_sock=None, folder_name=None, extra_arg=None):
+    def remove_dir(self, data_sock=None, folder_name=None, extra_arg=None):
         """Remove a directory"""
-        self.send('RMD', folder_name)
-        reply = self.receive_answer()
+        reply = self.send('RMD', folder_name)
         if not reply.startswith('2'):
             raise NotChangedDirectoryError('Cannot remove directory')
 
     def nlst(self, data_sock=None, folder_name=None, extra_arg=None):
         """Returns a list of file names in a specified directory"""
-        self.send('NLST')
-        reply = self.receive_answer()
+        reply = self.send('NLST')
         return reply
 
     def rename(self, data_sock=None, old_name=None, new_name=None):
-        self.send('RNFR', old_name)
-        reply = self.receive_answer()
-        if not reply.startswith('2'):
-            raise NotChangedDirectoryError('Cannot rename directory')
-        self.send('RNTO', new_name)
-        reply = self.receive_answer()
-        if not reply.startswith('2'):
-            raise NotChangedDirectoryError('Cannot rename directory')
+        """Rename file or directory"""
+        reply = self.send('RNFR', old_name)
+        # print(reply)
+        if not reply.startswith('3'):
+            return reply
+        reply = self.send('RNTO', new_name)
+        return reply
+
+    def delete_file(self, data_sock=None, file=None, args=None):
+        """Delete file"""
+        reply = self.send('DELE', file)
+        return reply
 
     @staticmethod
     def invalid(arg1, arg2, arg3):
@@ -371,7 +361,7 @@ class FTP:
         sys.stdout.write('Invalid command\nUse "?" command for internal help')
 
     @staticmethod
-    def int_help(arg1, arg2, arg3):
+    def help(arg1, arg2, arg3):
         """Print FTP-client help"""
         print("""Supported commands:
         Command\tUsing\t\tDescription\t
@@ -386,7 +376,8 @@ class FTP:
         pwd\tpwd\t\tPrint working directory
         mkd\tmkd $new_dir\tMake directory
         rmd\trmd $dir_name\tRemove directory
-        rename\trename $old $new\tRename file or directory
+        rename\trename $1 $2\tRename file or directory from $1 to $2
+        del\tdel $filename\tDelete file
         size\tsize $filename\tFind file size\t
         pasv\tpasv\t\tChange mode to the passive
         user\tuser $username\tRelogin\t
@@ -407,15 +398,16 @@ class FTP:
             'quit': self.disconnect,
             'size': self.size,
             'ls': self.dir_list,
-            'cd': self.cwd,
-            'pwd': self.pwd,
+            'cd': self.change_dir,
+            'pwd': self.current_dir,
             'rename': self.rename,
-            'mkd': self.mkd,
-            'rmd': self.rmd,
+            'mkd': self.make_dir,
+            'rmd': self.remove_dir,
             'get': self.get,
             'put': self.put,
+            'del': self.delete_file,
             'type': self.switch_type,
             'port': self.port,
             'pasv': self.pasv,
-            '?': self.int_help
+            '?': self.help
         }
