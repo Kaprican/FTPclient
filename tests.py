@@ -1,13 +1,27 @@
-from unittest import mock
+#!/usr/bin/python3
+# -*- coding: utf8 -*-
 
-from stubserver import FTPStubServer
-from Client import FTP, parse_data, get, upload
+from unittest import mock
+from Client import FTP, parse_data, get, upload, parse_params
 import tempfile
 import unittest
-from exceptions import *
+import sys
+import exceptions
+
+
+try:
+    from stubserver import FTPStubServer
+except Exception as e:
+    print('Module stubserver not found', file=sys.stderr)
+    print('Install stubserver')
+    sys.exit()
 
 
 class FTPclientTest(unittest.TestCase):
+
+    @staticmethod
+    def dummy(a1, a2, a3, a4):
+        pass
 
     def setUp(self):
         self.server = FTPStubServer(0)
@@ -33,7 +47,7 @@ class FTPclientTest(unittest.TestCase):
         self.server.add_file(file, 'asd')
         temp = tempfile.NamedTemporaryFile(delete=False)
         with mock.patch.object(self.ftp, 'size', return_value=5):
-            self.ftp.get(None, file, temp.name)
+            self.ftp.get(None, file, temp.name, self.dummy)
         with open(temp.name, 'r') as file:
             data = file.read()
         self.assertEqual(data, "asd")
@@ -61,7 +75,7 @@ class FTPclientTest(unittest.TestCase):
         self.assertTrue(self.ftp.binary)
 
     def test_no_type(self):
-        with self.assertRaises(NoTypeException):
+        with self.assertRaises(exceptions.NoTypeException):
             self.ftp.switch_type()
 
 
@@ -70,9 +84,8 @@ class FTPParserTest(unittest.TestCase):
     def test_simple(self):
         data = vars(parse_data(['127.0.0.1 21']))
         exp = {'address': '127.0.0.1 21',
-               'l': 'anonymous',
+               'l': ('ftp', 'ftp'),
                'port': 21,
-               'p': 'example@mail.com',
                'passive': False,
                'get': None,
                'upload': None}
@@ -81,9 +94,8 @@ class FTPParserTest(unittest.TestCase):
     def test_simple_port(self):
         data = vars(parse_data(['127.0.0.1 21', '25']))
         exp = {'address': '127.0.0.1 21',
-               'l': 'anonymous',
+               'l': ('ftp', 'ftp'),
                'port': 25,
-               'p': 'example@mail.com',
                'passive': False,
                'get': None,
                'upload': None}
@@ -92,9 +104,8 @@ class FTPParserTest(unittest.TestCase):
     def test_passive(self):
         data = vars(parse_data(['127.0.0.1 21', '-passive']))
         exp = {'address': '127.0.0.1 21',
-               'l': 'anonymous',
+               'l': ('ftp', 'ftp'),
                'port': 21,
-               'p': 'example@mail.com',
                'passive': True,
                'get': None,
                'upload': None}
@@ -103,9 +114,8 @@ class FTPParserTest(unittest.TestCase):
     def test_get(self):
         data = vars(parse_data(['127.0.0.1 21', '-get', 'flp/readme.txt', 'current']))
         exp = {'address': '127.0.0.1 21',
-               'l': 'anonymous',
+               'l': ('ftp', 'ftp'),
                'port': 21,
-               'p': 'example@mail.com',
                'passive': False,
                'get': ['flp/readme.txt', 'current'],
                'upload': None}
@@ -114,12 +124,24 @@ class FTPParserTest(unittest.TestCase):
     def test_upload(self):
         data = vars(parse_data(['127.0.0.1 21', '-upload', 'flp/readme.txt', 'current']))
         exp = {'address': '127.0.0.1 21',
-               'l': 'anonymous',
+               'l': ('ftp', 'ftp'),
                'port': 21,
-               'p': 'example@mail.com',
                'passive': False,
                'get': None,
                'upload': ['flp/readme.txt', 'current']}
+        self.assertTrue(data == exp)
+
+
+class FTPClientTest(unittest.TestCase):
+
+    def test_parse_params1(self):
+        data = parse_params(r'get "Два мегабайта.txt" "C:\Users\nasty\OneDrive\Documents\Новая папка\\"')
+        exp = ["get", "Два мегабайта.txt", r"C:\Users\nasty\OneDrive\Documents\Новая папка" + "\\"]
+        self.assertTrue(data == exp)
+
+    def test_parse_params4(self):
+        data = parse_params(r'get f1.txt "C:\Users\nasty\OneDrive\Documents\Новая папка\\"')
+        exp = ["get", "f1.txt", r"C:\Users\nasty\OneDrive\Documents\Новая папка" + "\\"]
         self.assertTrue(data == exp)
 
 
