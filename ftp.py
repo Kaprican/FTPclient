@@ -131,9 +131,7 @@ class FTP:
                                     (file_to_load))
         if not self.passive:
             data_sock, address = sock.accept()
-        print('I want to open file')
         with open(local_file, 'wb') as result:
-            print('open')
             received = 0
             start = time.time()
             while fsize > received:

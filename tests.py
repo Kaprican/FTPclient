@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 
 from unittest import mock
-from Client import FTP, parse_data, get, upload, parse_params
+from Client import FTP, parse_data, get, upload, parse_params, print_progress
 import tempfile
 import unittest
 import sys
@@ -138,6 +138,19 @@ class FTPClientTest(unittest.TestCase):
         data = parse_params(r'get "Два мегабайта.txt" "C:\Users\nasty\OneDrive\Documents\Новая папка\\"')
         exp = ["get", "Два мегабайта.txt", r"C:\Users\nasty\OneDrive\Documents\Новая папка" + "\\"]
         self.assertTrue(data == exp)
+
+    def test_good_parse_without_quotes(self):
+        data = parse_params(r'get мегабайт.txt "C:\Users\nasty\OneDrive\Documents\\"')
+        exp = ["get", "мегабайт.txt", r"C:\Users\nasty\OneDrive\Documents" + "\\"]
+        self.assertEqual(data, exp)
+
+    def test_bad_parse_without_quotes1(self):
+        data = parse_params(r'get "Два мегабайта.txt" C:\Users\nasty\OneDrive\Documents\Python tasks\\')
+        self.assertEqual(data, None)
+
+    def test_bad_parse_without_quotes2(self):
+        data = parse_params(r'get Два мегабайта.txt "C:\Users\nasty\OneDrive\Documents\Python tasks\\"')
+        self.assertEqual(data, None)
 
     def test_parse_params4(self):
         data = parse_params(r'get f1.txt "C:\Users\nasty\OneDrive\Documents\Новая папка\\"')

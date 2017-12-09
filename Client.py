@@ -139,6 +139,8 @@ def parse_params(message):
     except Exception:
         sys.stdout.write('Wrong parameters' + '\n')
         return None
+    if len(query) > 3:
+        return None
     return query
 
 
