@@ -20,6 +20,7 @@ if sys.version_info < (3, 4):
 __version__ = '3.2'
 __author__ = 'Iljushchenko Anastasia'
 
+
 WELCOME = '''
  _      _____ _     ____  ____  _      _____
 / \  /|/  __// \   /   _\/  _ \/ \__/|/  __/
@@ -78,6 +79,7 @@ def main():
     data_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         data_sock.connect((data.address, data.port))
+        data_sock.settimeout(ftp.TIMEOUT)
         data_sock.close()
         data_login = data.l[0:2]
         print(ftp.log_in(data_sock, *data_login))
@@ -118,26 +120,26 @@ def run(ftp, data_sock):
                 if isinstance(result, socket.socket):
                     data_sock = result
                 else:
-                    sys.stdout.write(result)
+                    sys.stderr.write(result)
         except ConnectionError as error:
-            sys.stdout.write(str(error) + '\n')
+            sys.stderr.write(str(error) + '\n')
             ftp.disconnect()
             # raise error
         except PermissionError as error:
-            sys.stdout.write(str(error) + '\n')
+            sys.stderr.write(str(error) + '\n')
             ftp.log_in()
         except Exception as error:
-            sys.stdout.write(str(error) + '\n')
+            sys.stderr.write(str(error) + '\n')
 
 
 def parse_params(message):
     try:
         query = shlex.split(message)
     except ValueError:
-        sys.stdout.write('Please add one more \\ at the end of the path' + '\n')
+        sys.stderr.write('Please add one more \\ at the end of the path' + '\n')
         return None
     except Exception:
-        sys.stdout.write('Wrong parameters' + '\n')
+        sys.stderr.write('Wrong parameters' + '\n')
         return None
     if len(query) > 3:
         return None
@@ -178,9 +180,7 @@ def get(ftp, data_sock, filename, os_path):
     path = os.path.dirname(filename)
     if os_path == 'current':
         os_path = None
-    # local_dir = os.path.dirname(os_path)
     file_name = os.path.basename(filename)
-    # local_file = os.path.join(local_dir, file_name)
     try:
         ftp.change_dir(data_sock, path)
         return ftp.get(data_sock, file_name, os_path, print_progress)
@@ -210,4 +210,3 @@ def upload(ftp, data_sock, filename, path):
 
 if __name__ == '__main__':
     main()
-    sys.exit(0)

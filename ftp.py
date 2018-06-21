@@ -14,11 +14,12 @@ from exceptions import NotChangedDirectoryError, PortNotAllowedError,\
 class FTP:
 
     UNITS = ['B/s', 'KB/s', 'MB/s', 'GB/s']
+    TIMEOUT = 10
 
     def __init__(self, passive=False):
         """FTP class"""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(5)
+        self.sock.settimeout(2)
         self.passive = passive
         self.binary = False
         self.closed = False
@@ -51,9 +52,7 @@ class FTP:
             if passw is None:
                 passw = getpass()
         self.send('USER', name)
-        # print(reply)
         reply = self.send('PASS', passw)
-        # print(reply)
         if not re.match(r'2\d\d', reply):
             raise LoginException('Login is incorrect. Try again')
         return 'The login with username \"' + name + '\" was successful'
@@ -71,8 +70,7 @@ class FTP:
             except TimeoutError:
                 break
             except Exception as error:
-                print(error)
-                break
+                raise error
         return b''.join(reply).decode('UTF-8', errors='ignore')
 
     @staticmethod
@@ -124,7 +122,6 @@ class FTP:
         else:
             data_sock = self.pasv()
         reply = self.send('RETR', file_to_load)
-        # print(reply)
 
         if not reply.startswith('150'):
             raise FileNotFoundError('Couldn\'t download file {}'.format
@@ -159,7 +156,6 @@ class FTP:
         else:
             data_sock = self.pasv()
         reply = self.send('STOR', remote_name)
-        # print(reply)
         if reply[0] == '5':
             raise PermissionError('You have no permission to store the file. '
                                   'Please, relogin')
@@ -180,7 +176,7 @@ class FTP:
     def pasv(self, data_sock=None, argument=None, extra_arg=None, f=None):
         """Switch on passive mode"""
         reply = self.send('PASV')
-        # print(reply)
+
         reg = r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)'
         numbs = re.findall(reg, reply)[0]
         if not numbs:
@@ -211,7 +207,7 @@ class FTP:
         query = 'PORT {},{},{}'.format(ip_address.replace('.', ','),
                                        port_int, port_modulo)
         reply = self.send(query)
-        # print(reply)
+
         if not reply.startswith('2'):
             raise PortNotAllowedError('Active mode is not available')
         return sock
@@ -227,17 +223,16 @@ class FTP:
         else:
             data_sock = self.pasv()
         reply = self.send('LIST')
-        # print(reply)
+
         if not self.passive:
             data_sock, address = sock.accept()
         if data_sock is None:
             raise ConnectionError('Data connection is required')
         data = self.receive_full_data(data_sock)
         dir_list += data + '\n'
-        # print(data)
         data_sock.close()
         reply = self.receive_answer()
-        # print(reply)  # 226 Transfer complete
+        # 226 Transfer complete
         if flag and flag.lower() == '-r' \
                 and (counter is None or int(counter) > 0):
             reg = re.compile(r' (\.|\w+)+?\r\n')
@@ -292,7 +287,6 @@ class FTP:
         if not reply.startswith('2'):
             raise WrongTypeException('This data type does not exist')
         self.binary = type == 'I'
-        # print(reply)
 
     def disconnect(self, data_sock=None, argument=None, extra_arg=None, f=None):
         """Abort a session"""
@@ -300,12 +294,12 @@ class FTP:
         self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
         self.closed = True
-        # print(reply)
 
     def connect(self, address, port):
         """Create a control socket"""
         # Присоединяемся к серверу
         self.sock.connect((address, port))
+        self.sock.settimeout(self.TIMEOUT)
         return self.receive_answer()
 
     def change_dir(self, data_sock, path, extra_arg=None, f=None):
@@ -339,7 +333,6 @@ class FTP:
     def rename(self, data_sock=None, old_name=None, new_name=None, f=None):
         """Rename file or directory"""
         reply = self.send('RNFR', old_name)
-        # print(reply)
         if not reply.startswith('3'):
             return reply
         reply = self.send('RNTO', new_name)
